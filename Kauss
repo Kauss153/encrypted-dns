@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>PayloadContent</key>
+    <array>
+        <dict>
+            <key>PayloadType</key>
+            <string>com.apple.network.eap.user</string>
+            <key>PayloadVersion</key>
+            <integer>1</integer>
+            <key>SSID_STR</key>
+            <string>Nome_da_Sua_Rede</string>
+            <key>DNS</key>
+            <array>
+                <string>8.8.8.8</string>
+                <string>8.8.4.4</string>
+            </array>
+        </dict>
+    </array>
+    <key>PayloadType</key>
+    <string>Configuration</string>
+    <key>PayloadUUID</key>
+    <string>UUID_UNICO_DO_PERFIL</string>
+    <key>PayloadDisplayName</key>
+    <string>Configuração de DNS</string>
+    <key>PayloadIdentifier</key>
+    <string>com.seudominio.dnsconfig</string>
+    <key>PayloadVersion</key>
+    <integer>1</integer>
+</dict>
+</plist>
+using UnityEngine;
+
+public class AimAssist : MonoBehaviour
+{
+    [Header("Settings")]
+    public Transform playerCamera; // A câmera do jogador
+    public float aimAssistRadius = 5f; // Raio da hitbox
+    public float headHeightOffset = 1.5f; // Altura da cabeça em relação à posição do jogador
+    public LayerMask targetLayer; // Camadas que podem ser alvos
+    public float rotationSpeed = 10000f; // Velocidade de rotação da câmera (máxima)
+    public float maxDistanceToHead = 0.1f; // Distância máxima em relação à cabeça
+
+    private Transform currentTarget; // Alvo atual
+    private Health targetHealth; // Componente de vida do alvo
+
+    private void Update()
+    {
+        if (Input.GetMouseButton(1)) // Botão direito do mouse
+        {
+            AimAtHead();
+        }
+
+        if (Input.GetButtonDown("Fire1")) // Botão de disparo (ex: botão esquerdo do mouse)
+        {
+            ShootAtTarget();
+        }
+        else
+        {
+            ResetTarget();
+        }
+    }
+
+    private void AimAtHead()
+    {
+        RaycastHit hit;
+        Ray ray = playerCamera.GetComponent<Camera>().ScreenPointToRay(Input.mousePosition);
+
+        if (Physics.Raycast(ray, out hit, aimAssistRadius, targetLayer))
+        {
+            Vector3 headPosition = hit.collider.transform.position + Vector3.up * headHeightOffset;
+            Health healthComponent = hit.collider.GetComponent<Health>();
+
+            if (healthComponent != null && healthComponent.CurrentHealth > 0)
+            {
+                currentTarget = hit.collider.transform;
+                targetHealth = healthComponent;
+
+                // Ajusta a rotação da câmera para mirar na cabeça
+                Vector3 directionToHead = (headPosition - playerCamera.position).normalized;
+                Quaternion targetRotation = Quaternion.LookRotation(directionToHead);
+
+                // Calcula a nova direção da câmera
+                Vector3 currentForward = playerCamera.forward;
+                Vector3 newDirection = Vector3.RotateTowards(currentForward, directionToHead, rotationSpeed * Time.deltaTime, 0.0f);
+                playerCamera.rotation = Quaternion.LookRotation(newDirection);
+
+                // Verifica se a câmera não está ultrapassando a cabeça
+                if (Vector3.Distance(playerCamera.position, headPosition) > maxDistanceToHead)
+                {
+                    playerCamera.position = Vector3.MoveTowards(playerCamera.position, headPosition, maxDistanceToHead);
+                }
+            }
+        }
+        else
+        {
+            ResetTarget();
+        }
+    }
+
+    private void ShootAtTarget()
+    {
+        if (currentTarget != null && targetHealth != null && targetHealth.CurrentHealth > 0)
+        {
+            // Ajuste a mira para a hitbox do alvo
+            Vector3 targetPosition = currentTarget.position + Vector3.up * headHeightOffset; // Posição da cabeça
+            Vector3 directionToTarget = (targetPosition - playerCamera.position).normalized;
+            Quaternion targetRotation = Quaternion.LookRotation(directionToTarget);
+
+            // Ajusta a rotação para a hitbox do alvo
+            playerCamera.rotation = Quaternion.RotateTowards(playerCamera.rotation, targetRotation, rotationSpeed * Time.deltaTime);
+            
+            // Aqui você pode adicionar a lógica para efetuar o disparo
+            Debug.Log("Disparando no alvo: " + currentTarget.name);
+
+            // Simulação de disparo (substitua com sua lógica de disparo)
+            // Exemplo: Instantiate(projétilPrefab, playerCamera.position, targetRotation);
+        }
+    }
+
+    private void ResetTarget()
+    {
+        currentTarget = null;
+        targetHealth = null;
+    }
+
+    private void OnDrawGizmos()
+    {
+        Gizmos.color = Color.red;
+        Gizmos.DrawWireSphere(playerCamera.position, aimAssistRadius);
+    }
+}
+
+public class Health : MonoBehaviour
+{
+    public float MaxHealth = 100f; // Vida máxima
+    public float CurrentHealth { get; private set; }
+
+    private void Start()
+    {
+        CurrentHealth = MaxHealth; // Inicializa a vida atual
+    }
+
+    public void TakeDamage(float amount)
+    {
+        CurrentHealth -= amount;
+        if (CurrentHealth <= 0)
+        {
+            CurrentHealth = 0;
+            // Aqui você pode adicionar lógica de morte
+            // gameObject.SetActive(false);
+        }
+    }
+}
